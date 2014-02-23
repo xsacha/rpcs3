@@ -1,11 +1,13 @@
 #include "stdafx.h"
 #include "SysCalls.h"
 #include "SC_FUNC.h"
+#include <mutex>
 
 Module* g_modules[3][0xff] = {0};
 uint g_max_module_id = 0;
 uint g_module_2_count = 0;
 ArrayF<ModuleFunc> g_modules_funcs_list;
+std::mutex g_funcs_lock;
 
 struct ModuleInfo
 {
@@ -19,7 +21,7 @@ static const g_module_list[] =
 	{0x0002, "cellHttpUtil"},
 	{0x0003, "cellSsl"},
 	{0x0004, "cellHttps"},
-	{0x0005, "cellVdec"},
+	{0x0005, "libvdec"},
 	{0x0006, "cellAdec"},
 	{0x0007, "cellDmux"},
 	{0x0008, "cellVpost"},
@@ -40,7 +42,7 @@ static const g_module_list[] =
 	{0x0017, "sys_io"},
 	{0x0018, "cellPngDec"},
 	{0x0019, "cellFont"},
-	{0x001a, "cellFontFt"},
+	{0x001a, "cellFontFT"},
 	{0x001b, "cellFreetype"},
 	{0x001c, "cellUsbd"},
 	{0x001d, "cellSail"},
@@ -142,20 +144,31 @@ bool IsLoadedFunc(u32 id)
 
 bool CallFunc(u32 num)
 {
-	for(u32 i=0; i<g_modules_funcs_list.GetCount(); ++i)
+	func_caller* func = nullptr;
 	{
-		if(g_modules_funcs_list[i].id == num)
+		std::lock_guard<std::mutex> lock(g_funcs_lock);
+
+		for(u32 i=0; i<g_modules_funcs_list.GetCount(); ++i)
 		{
-			(*g_modules_funcs_list[i].func)();
-			return true;
+			if(g_modules_funcs_list[i].id == num)
+			{
+				func = g_modules_funcs_list[i].func;
+				break;
+			}
 		}
 	}
-
+	if (func)
+	{
+		(*func)();
+		return true;
+	}
 	return false;
 }
 
 bool UnloadFunc(u32 id)
 {
+	std::lock_guard<std::mutex> lock(g_funcs_lock);
+
 	for(u32 i=0; i<g_modules_funcs_list.GetCount(); ++i)
 	{
 		if(g_modules_funcs_list[i].id == id)
@@ -187,24 +200,25 @@ void UnloadModules()
 		}
 	}
 
+	std::lock_guard<std::mutex> lock(g_funcs_lock);
 	g_modules_funcs_list.Clear();
 }
 
-Module* GetModuleByName(const wxString& name)
+Module* GetModuleByName(const std::string& name)
 {
 	for(u32 i=0; i<g_max_module_id; ++i)
 	{
-		if(g_modules[0][i] && g_modules[0][i]->GetName().Cmp(name) == 0)
+		if(g_modules[0][i] && g_modules[0][i]->GetName() == name)
 		{
 			return g_modules[0][i];
 		}
 
-		if(g_modules[1][i] && g_modules[1][i]->GetName().Cmp(name) == 0)
+		if(g_modules[1][i] && g_modules[1][i]->GetName() == name)
 		{
 			return g_modules[1][i];
 		}
 
-		if(g_modules[2][i] && g_modules[2][i]->GetName().Cmp(name) == 0)
+		if(g_modules[2][i] && g_modules[2][i]->GetName() == name)
 		{
 			return g_modules[2][i];
 		}
@@ -318,8 +332,10 @@ void Module::Load()
 
 	for(u32 i=0; i<m_funcs_list.GetCount(); ++i)
 	{
-		if(IsLoadedFunc(m_funcs_list[i].id)) continue;
+		std::lock_guard<std::mutex> lock(g_funcs_lock);
 
+		if(IsLoadedFunc(m_funcs_list[i].id)) continue;
+		
 		g_modules_funcs_list.Add(m_funcs_list[i]);
 	}
 
@@ -343,6 +359,8 @@ void Module::UnLoad()
 
 bool Module::Load(u32 id)
 {
+	std::lock_guard<std::mutex> lock(g_funcs_lock);
+
 	if(IsLoadedFunc(id)) return false;
 
 	for(u32 i=0; i<m_funcs_list.GetCount(); ++i)
@@ -378,34 +396,34 @@ u16 Module::GetID() const
 	return m_id;
 }
 
-wxString Module::GetName() const
+std::string Module::GetName() const
 {
 	return m_name;
 }
 
-void Module::SetName(const wxString& name)
+void Module::SetName(const std::string& name)
 {
 	m_name = name;
 }
 
 void Module::Log(const u32 id, wxString fmt, ...)
 {
-	if(enable_log)
+	if(Ini.HLELogging.GetValue())
 	{
 		va_list list;
 		va_start(list, fmt);
-		ConLog.Write(GetName() + wxString::Format("[%d]: ", id) + wxString::FormatV(fmt, list));
+		ConLog.Write(GetName() + wxString::Format("[%d]: ", id).wx_str() + wxString::FormatV(fmt, list).wx_str());
 		va_end(list);
 	}
 }
 
 void Module::Log(wxString fmt, ...)
 {
-	if(enable_log)
+	if(Ini.HLELogging.GetValue())
 	{
 		va_list list;
 		va_start(list, fmt);
-		ConLog.Write(GetName() + ": " + wxString::FormatV(fmt, list));
+		ConLog.Write(GetName() + ": " + wxString::FormatV(fmt, list).wx_str());
 		va_end(list);
 	}
 }
@@ -414,7 +432,7 @@ void Module::Warning(const u32 id, wxString fmt, ...)
 {
 	va_list list;
 	va_start(list, fmt);
-	ConLog.Warning(GetName() + wxString::Format("[%d] warning: ", id) + wxString::FormatV(fmt, list));
+	ConLog.Warning(GetName() + wxString::Format("[%d] warning: ", id).wx_str() + wxString::FormatV(fmt, list).wx_str());
 	va_end(list);
 }
 
@@ -422,7 +440,7 @@ void Module::Warning(wxString fmt, ...)
 {
 	va_list list;
 	va_start(list, fmt);
-	ConLog.Warning(GetName() + " warning: " + wxString::FormatV(fmt, list));
+	ConLog.Warning(GetName() + " warning: " + wxString::FormatV(fmt, list).wx_str());
 	va_end(list);
 }
 
@@ -430,7 +448,7 @@ void Module::Error(const u32 id, wxString fmt, ...)
 {
 	va_list list;
 	va_start(list, fmt);
-	ConLog.Error(GetName() + wxString::Format("[%d] error: ", id) + wxString::FormatV(fmt, list));
+	ConLog.Error(GetName() + wxString::Format("[%d] error: ", id).wx_str() + wxString::FormatV(fmt, list).wx_str());
 	va_end(list);
 }
 
@@ -438,32 +456,16 @@ void Module::Error(wxString fmt, ...)
 {
 	va_list list;
 	va_start(list, fmt);
-	ConLog.Error(GetName() + " error: " + wxString::FormatV(fmt, list));
+	ConLog.Error(GetName() + " error: " + wxString::FormatV(fmt, list).wx_str());
 	va_end(list);
 }
 
-bool Module::CheckId(u32 id) const
+bool Module::CheckID(u32 id) const
 {
-	return Emu.GetIdManager().CheckID(id) && !Emu.GetIdManager().GetIDData(id).m_name.Cmp(GetName());
+	return Emu.GetIdManager().CheckID(id) && Emu.GetIdManager().GetID(id).m_name == GetName();
 }
 
-bool Module::CheckId(u32 id, ID& _id) const
+bool Module::CheckID(u32 id, ID*& _id) const
 {
-	return Emu.GetIdManager().CheckID(id) && !(_id = Emu.GetIdManager().GetIDData(id)).m_name.Cmp(GetName());
-}
-
-template<typename T> bool Module::CheckId(u32 id, T*& data)
-{
-	ID id_data;
-
-	if(!CheckId(id, id_data)) return false;
-
-	data = (T*)id_data.m_data;
-
-	return true;
-}
-
-u32 Module::GetNewId(void* data, u8 flags)
-{
-	return Emu.GetIdManager().GetNewID(GetName(), data, flags);
+	return Emu.GetIdManager().CheckID(id) && (_id = &Emu.GetIdManager().GetID(id))->m_name == GetName();
 }

@@ -31,6 +31,32 @@ enum
 	CELL_GAME_ERROR_BOOTPATH			= 0x8002cb50,
 };
 
+// Definitions
+enum
+{
+	CELL_GAME_PATH_MAX				= 128,
+	CELL_GAME_DIRNAME_SIZE			= 32,
+	CELL_GAME_THEMEFILENAME_SIZE	= 48,
+	CELL_GAME_SYSP_TITLE_SIZE		= 128,
+	CELL_GAME_SYSP_TITLEID_SIZE		= 10,
+	CELL_GAME_SYSP_VERSION_SIZE		= 6,
+	CELL_GAME_SYSP_APP_VER_SIZE		= 6,
+
+	CELL_GAME_GAMETYPE_DISC			= 1,
+	CELL_GAME_GAMETYPE_HDD			= 2,
+
+	CELL_GAME_SIZEKB_NOTCALC        = -1,
+
+	CELL_GAME_ATTRIBUTE_PATCH					= 0x1,
+	CELL_GAME_ATTRIBUTE_APP_HOME				= 0x2,
+	CELL_GAME_ATTRIBUTE_DEBUG					= 0x4,
+	CELL_GAME_ATTRIBUTE_XMBBUY					= 0x8,
+	CELL_GAME_ATTRIBUTE_COMMERCE2_BROWSER		= 0x10,
+	CELL_GAME_ATTRIBUTE_INVITE_MESSAGE			= 0x20,
+	CELL_GAME_ATTRIBUTE_CUSTOM_DATA_MESSAGE		= 0x40,
+	CELL_GAME_ATTRIBUTE_WEB_BROWSER				= 0x100,
+};
+
 //Parameter IDs of PARAM.SFO
 enum
 {
@@ -66,9 +92,41 @@ enum
 	CELL_GAME_PARAMID_APP_VER			= 106,
 };
 
-int cellGameBootCheck()
+//Error dialog types
+enum
 {
-	UNIMPLEMENTED_FUNC(cellGame);
+	CELL_GAME_ERRDIALOG_BROKEN_GAMEDATA      =   0,
+	CELL_GAME_ERRDIALOG_BROKEN_HDDGAME       =   1,
+	CELL_GAME_ERRDIALOG_NOSPACE              =   2,
+	CELL_GAME_ERRDIALOG_BROKEN_EXIT_GAMEDATA = 100,
+	CELL_GAME_ERRDIALOG_BROKEN_EXIT_HDDGAME  = 101,
+	CELL_GAME_ERRDIALOG_NOSPACE_EXIT         = 102,
+};
+
+struct CellGameContentSize
+{
+	be_t<s32> hddFreeSizeKB;
+	be_t<s32> sizeKB;
+	be_t<s32> sysSizeKB;
+};
+
+int cellGameBootCheck(mem32_t type, mem32_t attributes, mem_ptr_t<CellGameContentSize> size, mem_list_ptr_t<u8> dirName)
+{
+	cellGame.Warning("cellGameBootCheck(type_addr=0x%x, attributes_addr=0x%x, size_addr=0x%x, dirName_addr=0x%x)",
+		type.GetAddr(), attributes.GetAddr(), size.GetAddr(), dirName.GetAddr());
+
+	if (!type.IsGood() || !attributes.IsGood() || !size.IsGood() || !dirName.IsGood())
+		return CELL_GAME_ERROR_PARAM;
+	
+	wxString dir = wxEmptyString;
+
+	type				= CELL_GAME_GAMETYPE_DISC;
+	attributes			= 0;
+	size->hddFreeSizeKB = 40000000; //40 GB, TODO: Use the free space of the computer's HDD where RPCS3 is being run.
+	size->sizeKB		= CELL_GAME_SIZEKB_NOTCALC;
+	size->sysSizeKB		= 0;
+	Memory.WriteString(dirName.GetAddr(), dir);
+
 	return CELL_OK;
 }
 
@@ -84,9 +142,14 @@ int cellGameDataCheck()
 	return CELL_OK;
 }
 
-int cellGameContentPermit()
+int cellGameContentPermit(mem_list_ptr_t<u8> contentInfoPath,  mem_list_ptr_t<u8> usrdirPath)
 {
-	UNIMPLEMENTED_FUNC(cellGame);
+	cellGame.Warning("cellGameContentPermit(contentInfoPath_addr=0x%x, usrdirPath_addr=0x%x)",
+		contentInfoPath.GetAddr(), usrdirPath.GetAddr());
+	
+	if (!contentInfoPath.IsGood() || !usrdirPath.IsGood())
+		return CELL_GAME_ERROR_PARAM;
+	
 	return CELL_OK;
 }
 
@@ -208,9 +271,29 @@ int cellGameGetLocalWebContentPath()
 	return CELL_OK;
 }
 
-int cellGameContentErrorDialog()
+int cellGameContentErrorDialog(s32 type, s32 errNeedSizeKB, u32 dirName_addr)
 {
-	UNIMPLEMENTED_FUNC(cellGame);
+	cellGame.Warning("cellGameContentErrorDialog(type=%d, errNeedSizeKB=%d, dirName_addr=0x%x)", type, errNeedSizeKB, dirName_addr);
+
+	if (Memory.IsGoodAddr(dirName_addr))
+		return CELL_GAME_ERROR_PARAM;
+
+	char* dirName = (char*)Memory.VirtualToRealAddr(dirName_addr);
+	std::string errorName;
+	switch(type)
+	{
+		case CELL_GAME_ERRDIALOG_BROKEN_GAMEDATA:      errorName = "Game data is corrupted (can be continued).";          break;
+		case CELL_GAME_ERRDIALOG_BROKEN_HDDGAME:       errorName = "HDD boot game is corrupted (can be continued).";      break;
+		case CELL_GAME_ERRDIALOG_NOSPACE:              errorName = "Not enough available space (can be continued).";      break;
+		case CELL_GAME_ERRDIALOG_BROKEN_EXIT_GAMEDATA: errorName = "Game data is corrupted (terminate application).";     break;
+		case CELL_GAME_ERRDIALOG_BROKEN_EXIT_HDDGAME:  errorName = "HDD boot game is corrupted (terminate application)."; break;
+		case CELL_GAME_ERRDIALOG_NOSPACE_EXIT:         errorName = "Not enough available space (terminate application)."; break;
+		default: return CELL_GAME_ERROR_PARAM;
+	}
+
+	std::string errorMsg = wxString::Format("%s\nSpace needed: %d KB\nDirectory name: %s",
+		wxString(errorName).wx_str(), errNeedSizeKB, wxString(dirName).wx_str());
+	wxMessageBox(errorMsg, wxGetApp().GetAppName(), wxICON_ERROR | wxOK);
 	return CELL_OK;
 }
 

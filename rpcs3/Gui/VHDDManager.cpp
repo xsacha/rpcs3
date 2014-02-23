@@ -67,7 +67,7 @@ VHDDExplorer::VHDDExplorer(wxWindow* parent, const wxString& hdd_path) : wxDialo
 	m_list->InsertColumn(2, "Size");
 	m_list->InsertColumn(3, "Creation time");
 
-	m_hdd = new vfsHDD(hdd_path);
+	m_hdd = new vfsHDD(nullptr, hdd_path);
 	UpdateList();
 	Connect(m_list->GetId(),	wxEVT_COMMAND_LIST_BEGIN_DRAG,		wxListEventHandler(VHDDExplorer::OnListDrag));
 	Connect(m_list->GetId(),	wxEVT_COMMAND_LIST_ITEM_ACTIVATED,	wxListEventHandler(VHDDExplorer::DClick));
@@ -141,7 +141,7 @@ void VHDDExplorer::Export(const wxString& path, const wxString& to)
 {
 	if(!m_hdd->Open(path))
 	{
-		wxMessageBox(wxString::Format("EXPORT ERROR: file open error. (%s)", path.mb_str()));
+		wxMessageBox(wxString::Format("EXPORT ERROR: file open error. (%s)", path.wx_str()));
 		return;
 	}
 
@@ -188,7 +188,7 @@ void VHDDExplorer::OnDropFiles(wxDropFilesEvent& event)
 
 	for(int i=0; i<count; ++i)
 	{
-		ConLog.Write("Importing '%s'", dropped[i].mb_str());
+		ConLog.Write("Importing '%s'", dropped[i].wx_str());
 		Import(dropped[i], wxFileName(dropped[i]).GetFullName());
 	}
 

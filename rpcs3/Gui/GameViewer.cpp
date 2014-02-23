@@ -8,7 +8,7 @@ GameViewer::GameViewer(wxWindow* parent) : wxListView(parent)
 	LoadSettings();
 	m_columns.Show(this);
 
-	m_path = wxGetCwd(); //TODO
+	m_path = "/dev_hdd0/game/";
 
 	Connect(GetId(), wxEVT_COMMAND_LIST_ITEM_ACTIVATED, wxListEventHandler(GameViewer::DClick));
 
@@ -27,23 +27,21 @@ void GameViewer::DoResize(wxSize size)
 
 void GameViewer::LoadGames()
 {
-	if(!wxDirExists(m_path)) return;
+	vfsDir dir(m_path);
+	ConLog.Write("path: %s", m_path.wx_str());
+	if(!dir.IsOpened()) return;
 
 	m_games.Clear();
-	wxDir dir(m_path);
-	if(!dir.HasSubDirs()) return;
 
-	wxString buf;
-	if(!dir.GetFirst(&buf)) return;
-	if(wxDirExists(buf)) m_games.Add(buf);
-
-	for(;;)
+	for(const DirEntryInfo* info = dir.Read(); info; info = dir.Read())
 	{
-		if(!dir.GetNext(&buf)) break;
-		if(wxDirExists(buf)) m_games.Add(buf);
+		if(info->flags & DirEntry_TypeDir)
+		{
+			m_games.Add(info->name);
+		}
 	}
 
-	//ConLog.Write("path: %s", m_path);
+	//ConLog.Write("path: %s", m_path.wx_str());
 	//ConLog.Write("folders count: %d", m_games.GetCount());
 }
 
@@ -52,9 +50,11 @@ void GameViewer::LoadPSF()
 	m_game_data.Clear();
 	for(uint i=0; i<m_games.GetCount(); ++i)
 	{
-		const wxString& path = m_games[i] + "\\" + "PARAM.SFO";
-		if(!wxFileExists(path)) continue;
-		vfsLocalFile f(path);
+		const wxString& path = m_path + m_games[i] + "/PARAM.SFO";
+		vfsFile f;
+		if(!f.Open(path))
+			continue;
+
 		PSFLoader psf(f);
 		if(!psf.Load(false)) continue;
 		psf.m_info.root = m_games[i];
@@ -71,9 +71,11 @@ void GameViewer::ShowData()
 
 void GameViewer::Refresh()
 {
+	Emu.GetVFS().Init(m_path);
 	LoadGames();
 	LoadPSF();
 	ShowData();
+	Emu.GetVFS().UnMountAll();
 }
 
 void GameViewer::SaveSettings()
@@ -91,14 +93,15 @@ void GameViewer::DClick(wxListEvent& event)
 	long i = GetFirstSelected();
 	if(i < 0) return;
 
-	const wxString& path = m_path + "\\" + m_game_data[i].root + "\\" + "USRDIR" + "\\" + "BOOT.BIN";
-	if(!wxFileExists(path))
-	{
-		ConLog.Error("Boot error: elf not found! [%s]", path.mb_str());
-		return;
-	}
+	const wxString& path = m_path + m_game_data[i].root;
 
 	Emu.Stop();
-	Emu.SetPath(path);
+	Emu.GetVFS().Init(path);
+	wxString local_path;
+	if(Emu.GetVFS().GetDevice(path, local_path) && !Emu.BootGame(local_path.ToStdString()))
+	{
+		ConLog.Error("Boot error: elf not found! [%s]", path.wx_str());
+		return;
+	}
 	Emu.Run();
 }

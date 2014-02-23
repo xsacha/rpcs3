@@ -52,8 +52,8 @@ static func_caller* sc_table[1024] =
 	null_func,												//77  (0x04D)
 	null_func,												//78  (0x04E)
 	null_func,												//79  (0x04F)
-	null_func, null_func, null_func, null_func, null_func, //84
-	null_func, null_func, null_func, null_func, null_func, //89
+	null_func, null_func, bind_func(sys_event_flag_create), bind_func(sys_event_flag_destroy), null_func, //84
+	bind_func(sys_event_flag_wait), bind_func(sys_event_flag_trywait), bind_func(sys_event_flag_set), null_func, null_func, //89
 	bind_func(sys_semaphore_create),						//90  (0x05A)
 	bind_func(sys_semaphore_destroy),						//91  (0x05B)
 	bind_func(sys_semaphore_wait),							//92  (0x05C)
@@ -74,9 +74,9 @@ static func_caller* sc_table[1024] =
 	bind_func(sys_cond_wait),								//107 (0x06B)
 	bind_func(sys_cond_signal),								//108 (0x06C)
 	bind_func(sys_cond_signal_all),							//109 (0x06D)
-	null_func, null_func, null_func, null_func,             //110 (0x06E)
+	bind_func(sys_cond_signal_to), null_func, null_func, null_func,             //113 (0x071)
 	bind_func(sys_semaphore_get_value),                     //114 (0x072)
-	null_func, null_func, null_func, null_func, null_func,  //119 (0x077)
+	null_func, null_func, null_func, bind_func(sys_event_flag_clear), null_func,  //119 (0x077)
 	bind_func(sys_rwlock_create),							//120 (0x078)
 	bind_func(sys_rwlock_destroy),							//121 (0x079)
 	bind_func(sys_rwlock_rlock),							//122 (0x07A)
@@ -86,20 +86,25 @@ static func_caller* sc_table[1024] =
 	bind_func(sys_rwlock_trywlock),							//126 (0x07E)
 	bind_func(sys_rwlock_wunlock),							//127 (0x07F)
 	bind_func(sys_event_queue_create),						//128 (0x080)
-	null_func,												//129 (0x081)
-	bind_func(sys_event_queue_receive), null_func, null_func, null_func, bind_func(sys_event_port_create), //134
-	null_func, bind_func(sys_event_port_connect_local), null_func, bind_func(sys_event_port_send), null_func, //139
+	bind_func(sys_event_queue_destroy),						//129 (0x081)
+	bind_func(sys_event_queue_receive), bind_func(sys_event_queue_tryreceive), // 131
+	bind_func(sys_event_flag_cancel), bind_func(sys_event_queue_drain), bind_func(sys_event_port_create), //134
+	bind_func(sys_event_port_destroy), bind_func(sys_event_port_connect_local), //136
+	bind_func(sys_event_port_disconnect), bind_func(sys_event_port_send), bind_func(sys_event_flag_get), //139
 	null_func, bind_func(sys_timer_usleep), bind_func(sys_timer_sleep), null_func, bind_func(sys_time_get_timezone), //144
 	bind_func(sys_time_get_current_time), bind_func(sys_time_get_system_time), bind_func(sys_time_get_timebase_frequency), null_func, null_func, //149
 	null_func, null_func, null_func, null_func, null_func, //154
 	null_func, bind_func(sys_spu_image_open), null_func, null_func, null_func, //159
 	bind_func(sys_raw_spu_create), null_func, null_func, null_func, null_func, //164
-	null_func, null_func, null_func, null_func, bind_func(sys_spu_initialize), //169
-	bind_func(sys_spu_thread_group_create), bind_func(sys_spu_thread_set_argument), bind_func(sys_spu_thread_initialize), bind_func(sys_spu_thread_group_start), null_func, //174
-	null_func, null_func, null_func, null_func, null_func, //179
-	null_func, bind_func(sys_spu_thread_write_ls), bind_func(sys_spu_thread_read_ls), null_func, null_func, //184
-	null_func, null_func, null_func, null_func, null_func, //189
-	bind_func(sys_spu_thread_write_spu_mb), bind_func(sys_spu_thread_connect_event), null_func, null_func, null_func, //194
+	bind_func(sys_spu_thread_get_exit_status), bind_func(sys_spu_thread_set_argument), null_func, null_func, bind_func(sys_spu_initialize), //169
+	bind_func(sys_spu_thread_group_create), bind_func(sys_spu_thread_group_destroy), bind_func(sys_spu_thread_initialize), //172
+	bind_func(sys_spu_thread_group_start), bind_func(sys_spu_thread_group_suspend), //174
+	null_func, null_func, null_func, bind_func(sys_spu_thread_group_join), null_func, //179
+	null_func, bind_func(sys_spu_thread_write_ls), bind_func(sys_spu_thread_read_ls), null_func, bind_func(sys_spu_thread_write_snr), //184
+	bind_func(sys_spu_thread_group_connect_event), bind_func(sys_spu_thread_group_disconnect_event), //186
+	bind_func(sys_spu_thread_set_spu_cfg), bind_func(sys_spu_thread_get_spu_cfg), null_func, //189
+	bind_func(sys_spu_thread_write_spu_mb), bind_func(sys_spu_thread_connect_event), bind_func(sys_spu_thread_disconnect_event), //192
+	bind_func(sys_spu_thread_bind_queue), bind_func(sys_spu_thread_unbind_queue), //194
 	null_func, null_func, null_func, null_func, null_func, //199
 	null_func, null_func, null_func, null_func, null_func, //204
 	null_func, null_func, null_func, null_func, null_func, //209
@@ -111,7 +116,7 @@ static func_caller* sc_table[1024] =
 	null_func, null_func, null_func, null_func, null_func, //239
 	null_func, null_func, null_func, null_func, null_func, //244
 	null_func, null_func, null_func, null_func, null_func, //249
-	null_func, bind_func(sys_spu_thread_group_connect_event_all_threads), null_func, null_func, null_func, //254
+	null_func, bind_func(sys_spu_thread_group_connect_event_all_threads), bind_func(sys_spu_thread_group_disconnect_event_all_threads), null_func, null_func, //254
 	null_func, null_func, null_func, null_func, null_func, //259
 	null_func, null_func, null_func, null_func, null_func, //264
 	null_func, null_func, null_func, null_func, null_func, //269
@@ -121,17 +126,17 @@ static func_caller* sc_table[1024] =
 	null_func, null_func, null_func, null_func, null_func, //289
 	null_func, null_func, null_func, null_func, null_func, //294
 	null_func, null_func, null_func, null_func, null_func, //299
-	null_func, null_func, null_func, null_func, null_func, //304
-	null_func, null_func, null_func, null_func, null_func, //309
-	null_func, null_func, null_func, null_func, null_func, //314
+	bind_func(sys_vm_memory_map), bind_func(sys_vm_unmap), bind_func(sys_vm_append_memory), bind_func(sys_vm_return_memory), bind_func(sys_vm_lock), //304
+	bind_func(sys_vm_unlock), bind_func(sys_vm_touch), bind_func(sys_vm_flush), bind_func(sys_vm_invalidate), bind_func(sys_vm_store), //309
+	bind_func(sys_vm_sync), bind_func(sys_vm_test), bind_func(sys_vm_get_statistics), null_func, null_func, //314
 	null_func, null_func, null_func, null_func, null_func, //319
 	null_func, null_func, null_func, null_func, bind_func(sys_memory_container_create), //324
 	bind_func(sys_memory_container_destroy), null_func, null_func, null_func, null_func, //329
 	bind_func(sys_mmapper_allocate_address), null_func, null_func, null_func, null_func, //334
 	null_func, null_func, null_func, null_func, null_func, //339
-	null_func, null_func, null_func, null_func, null_func, //344
+	null_func, bind_func(sys_memory_container_create), bind_func(sys_memory_container_destroy), null_func, null_func, //344
 	null_func, null_func, null_func, bind_func(sys_memory_allocate), bind_func(sys_memory_free), //349
-	null_func, null_func, bind_func(sys_memory_get_user_memory_size), null_func, null_func, //354
+	null_func, bind_func(sys_memory_get_page_attribute), bind_func(sys_memory_get_user_memory_size), null_func, null_func, //354
 	null_func, null_func, null_func, null_func, null_func, //359
 	null_func, null_func, null_func, null_func, null_func, //364
 	null_func, null_func, null_func, null_func, null_func, //369
@@ -247,7 +252,7 @@ static func_caller* sc_table[1024] =
 	bind_func(cellFsMkdir),									//811 (0x32B)
 	bind_func(cellFsRename),								//812 (0x32C)
 	bind_func(cellFsRmdir),									//813 (0x32D)
-	null_func,												//814 (0x32E)
+	bind_func(cellFsUnlink),								//814 (0x32E)
 	null_func, null_func, null_func, bind_func(cellFsLseek), null_func, //819
 	null_func, null_func, null_func, null_func, null_func, //824
 	null_func, null_func, null_func, null_func, null_func, //829
@@ -292,8 +297,6 @@ static func_caller* sc_table[1024] =
 	null_func, null_func, null_func, bind_func(cellGcmCallback),    //1024
 };
 
-bool enable_log = false;
-
 void default_syscall()
 {
 	declCPU();
@@ -323,12 +326,12 @@ void default_syscall()
 		case 999:
 			dump_enable = !dump_enable;
 			Emu.Pause();
-			ConLog.Warning("Dump %s", dump_enable ? "enabled" : "disabled");
+			ConLog.Warning("Dump %s", wxString(dump_enable ? "enabled" : "disabled").wx_str());
 		return;
 
 		case 1000:
-			enable_log = !enable_log;
-			ConLog.Warning("Log %s", enable_log ? "enabled" : "disabled");
+			Ini.HLELogging.SetValue(!Ini.HLELogging.GetValue());
+			ConLog.Warning("Log %s", wxString(Ini.HLELogging.GetValue() ? "enabled" : "disabled").wx_str());
 		return;
 	}
 

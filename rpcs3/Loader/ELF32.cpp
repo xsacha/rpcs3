@@ -119,8 +119,8 @@ bool ELF32Loader::LoadShdrInfo()
 
 	if(ehdr.e_shstrndx >= shdr_arr.GetCount())
 	{
-		ConLog.Error("LoadShdr32 error: shstrndx too big!");
-		return false;
+		ConLog.Warning("LoadShdr32 error: shstrndx too big!");
+		return true;
 	}
 
 	for(u32 i=0; i<shdr_arr.GetCount(); ++i)
@@ -181,9 +181,9 @@ bool ELF32Loader::LoadPhdrData(u64 _offset)
 
 			switch(machine)
 			{
-			case MACHINE_SPU: Memory.MainMem.Alloc(phdr_arr[i].p_vaddr + offset, phdr_arr[i].p_memsz); break;
-			case MACHINE_MIPS: Memory.PSPMemory.RAM.Alloc(phdr_arr[i].p_vaddr + offset, phdr_arr[i].p_memsz); break;
-			case MACHINE_ARM: Memory.PSVMemory.RAM.Alloc(phdr_arr[i].p_vaddr + offset, phdr_arr[i].p_memsz); break;
+			case MACHINE_SPU: Memory.MainMem.AllocFixed(phdr_arr[i].p_vaddr + offset, phdr_arr[i].p_memsz); break;
+			case MACHINE_MIPS: Memory.PSPMemory.RAM.AllocFixed(phdr_arr[i].p_vaddr + offset, phdr_arr[i].p_memsz); break;
+			case MACHINE_ARM: Memory.PSVMemory.RAM.AllocFixed(phdr_arr[i].p_vaddr + offset, phdr_arr[i].p_memsz); break;
 
 			default:
 				continue;
@@ -225,13 +225,13 @@ bool ELF32Loader::LoadPhdrData(u64 _offset)
 
 			if(note.descsz == sizeof(note.desc))
 			{
-				ConLog.Warning("name = %s", note.name);
+				ConLog.Warning("name = %s", wxString(note.name, 8).wx_str());
 				ConLog.Warning("ls_size = %d", note.desc.ls_size);
 				ConLog.Warning("stack_size = %d", note.desc.stack_size);
 			}
 			else
 			{
-				ConLog.Warning("desc = '%s'", note.desc_text);
+				ConLog.Warning("desc = '%s'", wxString(note.desc_text, 32).wx_str());
 			}
 		}
 #ifdef LOADER_DEBUG
@@ -249,7 +249,7 @@ bool ELF32Loader::LoadShdrData(u64 offset)
 		Elf32_Shdr& shdr = shdr_arr[i];
 
 #ifdef LOADER_DEBUG
-		if(i < shdr_name_arr.GetCount()) ConLog.Write("Name: %s", shdr_name_arr[i]);
+		if(i < shdr_name_arr.GetCount()) ConLog.Write("Name: %s", shdr_name_arr[i].wx_str());
 		shdr.Show();
 		ConLog.SkipLn();
 #endif

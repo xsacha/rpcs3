@@ -3,19 +3,19 @@
 #define NOMINMAX
 
 #ifndef QT_UI
-#include <wx/string.h>
-
+#include <wx/msw/setup.h>
 #include <wx/wx.h>
+#include <wx/string.h>
 #include <wx/propdlg.h>
 #include <wx/stdpaths.h>
 #include <wx/filename.h>
 
 #include <wx/wfstream.h>
 #include <wx/dir.h>
-#include <wx/generic/progdlgg.h>
 #include <wx/spinctrl.h>
 #include <wx/datetime.h>
 #include <wx/filepicker.h>
+#include <wx/menuitem.h>
 
 #include <wx/wxprec.h>
 #endif
@@ -206,11 +206,14 @@ enum Status
 #include "Emu/System.h"
 #include "Emu/Cell/PPUThread.h"
 
+#include "Emu/FS/vfsDirBase.h"
 #include "Emu/FS/vfsFileBase.h"
+#include "Emu/FS/vfsLocalDir.h"
 #include "Emu/FS/vfsLocalFile.h"
-#include "Emu/FS/vfsFile.h"
 #include "Emu/FS/vfsStream.h"
 #include "Emu/FS/vfsStreamMemory.h"
+#include "Emu/FS/vfsFile.h"
+#include "Emu/FS/vfsDir.h"
 #include "rpcs3.h"
 
 #define _PRGNAME_ "RPCS3"

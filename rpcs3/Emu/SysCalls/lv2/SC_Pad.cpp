@@ -24,6 +24,16 @@ struct CellPadData
 	u16 button[CELL_PAD_MAX_CODES];
 };
 
+struct CellPadInfo
+{
+	u32 max_connect;
+	u32 now_connect;
+	u32 system_info;
+	u16 vendor_id[CELL_MAX_PADS];
+	u16 product_id[CELL_MAX_PADS];
+	u8  status[CELL_MAX_PADS];
+};
+
 struct CellPadInfo2
 {
 	u32 max_connect;
@@ -64,7 +74,7 @@ int cellPadClearBuf(u32 port_no)
 
 int cellPadGetData(u32 port_no, u32 data_addr)
 {
-	//ConLog.Warning("cellPadGetData[port_no: %d, data_addr: 0x%x]", port_no, data_addr);
+	sys_io.Log("cellPadGetData[port_no: %d, data_addr: 0x%x]", port_no, data_addr);
 	const Array<Pad>& pads = Emu.GetPadManager().GetPads();
 	if(!Emu.GetPadManager().IsInited()) return CELL_PAD_ERROR_UNINITIALIZED;
 	if(port_no >= pads.GetCount()) return CELL_PAD_ERROR_INVALID_PARAMETER;
@@ -97,13 +107,36 @@ int cellPadGetData(u32 port_no, u32 data_addr)
 		}
 	}
 
+	u16 lx = 128;
+	u16 ly = 128;
+	u16 rx = 128;
+	u16 ry = 128;
+	const Array<AnalogStick>& sticks = pads[port_no].m_sticks;
+	for (u32 s = 0; s < sticks.GetCount(); s++)
+	{
+		u16* res;
+		switch (sticks[s].m_offset)
+		{
+		case CELL_PAD_BTN_OFFSET_ANALOG_LEFT_X: res = &lx; break;
+		case CELL_PAD_BTN_OFFSET_ANALOG_LEFT_Y: res = &ly; break;
+		case CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_X: res = &rx; break;
+		case CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_Y: res = &ry; break;
+		default: continue;
+		}
+
+		if (sticks[s].m_max_pressed && !sticks[s].m_min_pressed)
+			*res = 255;
+		if (sticks[s].m_min_pressed && !sticks[s].m_max_pressed)
+			*res = 0;
+	}
+
 	data.len = re(len);
 	data.button[CELL_PAD_BTN_OFFSET_DIGITAL1]		= re(d1);
 	data.button[CELL_PAD_BTN_OFFSET_DIGITAL2]		= re(d2);
-	data.button[CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_X] = re(pad.m_analog_right_x);
-	data.button[CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_Y] = re(pad.m_analog_right_y);
-	data.button[CELL_PAD_BTN_OFFSET_ANALOG_LEFT_X]	= re(pad.m_analog_left_x);
-	data.button[CELL_PAD_BTN_OFFSET_ANALOG_LEFT_Y]	= re(pad.m_analog_left_y);
+	data.button[CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_X] = re(rx);
+	data.button[CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_Y] = re(ry);
+	data.button[CELL_PAD_BTN_OFFSET_ANALOG_LEFT_X]	= re(lx);
+	data.button[CELL_PAD_BTN_OFFSET_ANALOG_LEFT_Y]	= re(ly);
 	data.button[CELL_PAD_BTN_OFFSET_PRESS_RIGHT]	= re(pad.m_press_right);
 	data.button[CELL_PAD_BTN_OFFSET_PRESS_LEFT]		= re(pad.m_press_left);
 	data.button[CELL_PAD_BTN_OFFSET_PRESS_UP]		= re(pad.m_press_up);
@@ -139,6 +172,35 @@ int cellPadSetActDirect(u32 port_no, u32 param_addr)
 	sys_io.Log("cellPadSetActDirect(port_no=%d, param_addr=0x%x)", port_no, param_addr);
 	if(!Emu.GetPadManager().IsInited()) return CELL_PAD_ERROR_UNINITIALIZED;
 	if(port_no >= Emu.GetPadManager().GetPads().GetCount()) return CELL_PAD_ERROR_INVALID_PARAMETER;
+	return CELL_OK;
+}
+
+int cellPadGetInfo(u32 info_addr)
+{
+	sys_io.Log("cellPadGetInfo(info_addr=0x%x)", info_addr);
+	if(!Emu.GetPadManager().IsInited()) return CELL_PAD_ERROR_UNINITIALIZED;
+
+	CellPadInfo info;
+	memset(&info, 0, sizeof(CellPadInfo));
+
+	const PadInfo& rinfo = Emu.GetPadManager().GetInfo();
+	info.max_connect = re(rinfo.max_connect);
+	info.now_connect = re(rinfo.now_connect);
+	info.system_info = re(rinfo.system_info);
+
+	const Array<Pad>& pads = Emu.GetPadManager().GetPads();
+
+	for(u32 i=0; i<CELL_MAX_PADS; ++i)
+	{
+		if(i >= pads.GetCount()) break;
+
+		re(info.status[i], pads[i].m_port_status);
+		info.product_id[i] = const_se_t<u16, 0x0268>::value;
+		info.vendor_id[i] = const_se_t<u16, 0x054C>::value;
+	}
+
+	Memory.WriteData(info_addr, info);
+
 	return CELL_OK;
 }
 
@@ -180,5 +242,17 @@ int cellPadSetPortSetting(u32 port_no, u32 port_setting)
 
 	pads[port_no].m_port_setting = port_setting;
 
+	return CELL_OK;
+}
+
+int cellPadInfoPressMode(u32 port_no)
+{
+	sys_io.Error("cellPadInfoPressMode(port_no=%d)", port_no);
+	return CELL_OK;
+}
+
+int cellPadInfoSensorMode(u32 port_no)
+{
+	sys_io.Error("cellPadInfoSensorMode(port_no=%d)", port_no);
 	return CELL_OK;
 }
