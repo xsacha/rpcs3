@@ -3,7 +3,7 @@
 
 #include "Utilities/Log.h"
 #include "Memory.h"
-#include "System.h"
+#include "Emu/System.h"
 #include "Ini.h"
 
 MemoryBase Memory;
