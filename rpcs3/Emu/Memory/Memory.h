@@ -1,5 +1,6 @@
 #pragma once
 #include "MemoryBlock.h"
+#include "Emu/SysCalls/Callback.h"
 #include <vector>
 
 using std::nullptr_t;
